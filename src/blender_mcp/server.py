@@ -14,6 +14,7 @@ import sys
 import time
 import base64
 import re
+from pathlib import Path
 
 # Import telemetry
 from .telemetry import record_startup, get_telemetry, EventType
@@ -831,6 +832,94 @@ async def execute_blender_code(ctx: Context, code: str, user_prompt: str = "") -
         except (ValueError, KeyError, TypeError):
             return f"Error executing code: {str(e)}"
         return f"Error executing code: {detail.get('exception_type', 'Error')}: {detail.get('message', '')}\n\n{traceback_text}"
+
+
+@mcp.tool()
+async def create_youtube_thumbnail(
+    ctx: Context,
+    title: str,
+    highlight: list[str] | None = None,
+    preset: str = "creator",
+    badge: str | None = None,
+    background_path: str | None = None,
+    subject_path: str | None = None,
+    props: list[str] | None = None,
+    side: str = "right",
+    font: str | None = None,
+    face: str | None = None,
+    text_color: str | None = None,
+    highlight_color: str | None = None,
+    glow: str | None = None,
+    arrow_to: list[float] | None = None,
+    circle_at: list[float] | None = None,
+    circle_radius: float = 0.1,
+    output_path: str | None = None,
+    samples: int = 48,
+    user_prompt: str = "",
+) -> list:
+    """
+    Render a YouTube thumbnail (1280x720) in the user's Blender, in the style top creators use, and
+    return the image.
+
+    What it builds (in a new scene called "YouTube Thumbnail"; the user's scenes are not touched):
+    huge title text with a flat bright face, a solid 3D block behind it, a thick black outline and a
+    hard drop shadow, one word highlighted in colour; one subject that pops (a transparent cut-out
+    photo and/or photoreal 3D props) with a white stroke and a coloured halo; the backdrop graded,
+    vignetted and darkened behind the text. Text is fitted to its side of the frame automatically.
+
+    How top creators write them: 2-4 words, the hook word highlighted, one clear subject, no clutter.
+    Don't repeat the video title; tease it.
+
+    Parameters:
+    - title: 2-4 punchy words. \\n forces a line break; longer titles wrap automatically.
+    - highlight: Words to colour (default: the longest word).
+    - preset: creator (white + yellow), red, horror, fire, ice, money (green), clean.
+    - badge: Optional small tag in a red pill under the title, e.g. "1 VS 4", "100K COINS".
+    - background_path: Backdrop image (a gameplay frame or screenshot) on this computer.
+    - subject_path: Transparent PNG cut-out of the creator or a character (face reactions work best).
+    - props: Photoreal 3D props: Poly Haven ids (treasure_chest, ammo_box, wooden_crate_01,
+      stick_grenade, or any other Poly Haven model id) or paths to .gltf/.glb/.fbx/.obj/.blend files.
+    - side: right or left: where the subject / props go; the text takes the other side.
+    - font: lilita (default), anton, bebas, titan, archivo, luckiest, or a path to a .ttf/.otf.
+    - face: Title fill: flat (default), gold, chrome, fire, ice, toxic.
+    - text_color, highlight_color, glow: Hex colours (glow = halo behind the subject).
+    - arrow_to: [x, y] frame point (0..1, top-left origin) for a red arrow to point at.
+    - circle_at: [x, y] frame point for a red ring; circle_radius as a fraction of the width.
+    - output_path: Where to save (.jpg or .png). Default: ~/Pictures/YouTube Thumbnails/.
+    - samples: Cycles samples (24 = quick draft, 48 = default, 128 = final).
+    - user_prompt: The user's own words, verbatim.
+    """
+    from . import thumbnails
+
+    try:
+        spec = thumbnails.make_spec(
+            title, highlight=highlight, preset=preset, face=face, text_color=text_color,
+            highlight_color=highlight_color, font=font, badge=badge, background_path=background_path,
+            subject_path=subject_path, props=props, side=side, glow=glow, arrow_to=arrow_to,
+            circle_at=circle_at, circle_radius=circle_radius, output_path=output_path, samples=samples, live=True,
+        )
+    except ValueError as e:
+        return [TextContent(type="text", text=f"Error: {e}")]
+    except Exception as e:  # e.g. a Poly Haven download failed
+        return [TextContent(type="text", text=f"Error preparing the thumbnail: {e}")]
+    try:
+        blender = get_blender_connection()
+        # Trusted, bundled script: sent directly (safe mode's allowlist targets model-written code).
+        result = blender.send_command("execute_code", {"code": thumbnails.build_code(spec)})
+    except Exception as e:
+        logger.error(f"Thumbnail render failed: {e}")
+        return [TextContent(type="text", text=f"Error rendering thumbnail: {e}")]
+    out = spec["out"]
+    content = [TextContent(type="text", text=(
+        f"Thumbnail saved to {out}. The scene 'YouTube Thumbnail' stays open in Blender for tweaks "
+        f"(F12 to re-render).\n{(result or {}).get('result', '')[-500:]}"))]
+    try:
+        data = Path(out).read_bytes()
+        mime = "image/png" if out.lower().endswith(".png") else "image/jpeg"
+        content.append(ImageContent(type="image", data=base64.b64encode(data).decode("ascii"), mimeType=mime))
+    except OSError:
+        pass  # Blender runs on another machine: the path is on that machine.
+    return content
 
 
 def _polyhaven_credit(result):

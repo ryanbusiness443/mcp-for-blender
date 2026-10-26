@@ -33,6 +33,27 @@ Prompt-assisted 3D modeling, scene creation, and manipulation — driven by AI.
 
 ---
 
+## YouTube thumbnails
+
+Ask Claude for a thumbnail and the `create_youtube_thumbnail` tool renders one in your Blender, in the
+style top creators use. It builds in a new scene called "YouTube Thumbnail", so your own scenes are never touched.
+
+- **Text:** 2–4 huge words in a heavy font, with a flat bright face, a solid 3D block behind it, a thick black outline and a hard drop shadow. The hook word is highlighted in color.
+- **Subject:** a transparent cut-out photo (you, a character) and/or **photoreal 3D props** from [Poly Haven](https://polyhaven.com) (CC0, downloaded automatically: `treasure_chest`, `ammo_box`, `wooden_crate_01`, `stick_grenade`, or any Poly Haven model id or your own .glb/.fbx/.obj/.blend). Each subject gets a white stroke, a colored halo and studio lighting.
+- **Background:** your gameplay frame, graded, vignetted and darkened behind the text so it reads at phone size.
+- **Callouts:** an optional red arrow, ring or tag ("1 VS 4").
+- **Presets:** `creator` (white + yellow), `red`, `horror`, `fire`, `ice`, `money`, `clean`.
+- **Fonts:** Lilita One (default), Anton, Bebas Neue, Titan One, Archivo Black, Luckiest Guy. All are bundled and free to redistribute; see `src/blender_mcp/thumbnails/fonts/LICENSES.txt`.
+
+Example request: *"Make a thumbnail: 'I FOUND THE CHEST', badge '100k coins', use frame.jpg as the background and add a treasure chest."*
+
+Without Claude, from a terminal:
+
+```bash
+python scripts/youtube_thumbnail.py "I FOUND THE CHEST" --badge "100k coins" --background frame.jpg --props treasure_chest -o thumb.jpg
+python scripts/youtube_thumbnail.py "1 HP CLUTCH" --frame gameplay.mp4 --at 83 --arrow 0.78,0.65 -o thumb.jpg
+```
+
 ## Quickstart
 
 > **Note:** the PyPI package `blender-mcp` is now **`mcp-for-blender`**. Existing setups
